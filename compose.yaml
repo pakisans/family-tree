@@ -1,0 +1,7 @@
+﻿services:
+  familytree:
+    image: familytree
+    build:
+      context: .
+      dockerfile: Dockerfile
+
