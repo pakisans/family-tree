@@ -10,11 +10,18 @@ public class BaseService<TEntity, TFilter> : IBaseService<TEntity, TFilter>
     where TEntity : BaseEntity
     where TFilter : BaseFilterRequest
 {
+    protected readonly IUnitOfWork UnitOfWork;
     protected readonly IBaseRepository<TEntity> BaseRepository;
+    protected readonly IHttpContextAccessor HttpContextAccessor;
 
-    public BaseService(IBaseRepository<TEntity> baseRepository)
+    public BaseService(
+        IUnitOfWork unitOfWork,
+        IHttpContextAccessor httpContextAccessor,
+        IBaseRepository<TEntity>? baseRepository = null)
     {
-        BaseRepository = baseRepository;
+        UnitOfWork = unitOfWork;
+        HttpContextAccessor = httpContextAccessor;
+        BaseRepository = baseRepository ?? unitOfWork.GetRepository<TEntity>();
     }
 
     protected virtual string[] SearchableProperties => Array.Empty<string>();
@@ -37,28 +44,69 @@ public class BaseService<TEntity, TFilter> : IBaseService<TEntity, TFilter>
     public virtual async Task<TEntity?> AddAsync(TEntity entity)
     {
         await ValidateAsync(entity, true);
-        return await BaseRepository.AddAsync(entity);
+
+        TEntity addedEntity = await BaseRepository.AddAsync(entity);
+        await UnitOfWork.CompleteAsync();
+
+        return addedEntity;
     }
 
     public virtual async Task<TEntity?> UpdateAsync(long id, TEntity entity)
     {
         await ValidateAsync(entity, false);
-        return await BaseRepository.UpdateAsync(id, entity);
+
+        TEntity? updatedEntity = await BaseRepository.UpdateAsync(id, entity);
+
+        if (updatedEntity == null)
+        {
+            return null;
+        }
+
+        await UnitOfWork.CompleteAsync();
+
+        return updatedEntity;
     }
 
     public virtual async Task<bool> DeleteAsync(long id)
     {
-        return await BaseRepository.DeleteAsync(id);
+        bool deleted = await BaseRepository.DeleteAsync(id);
+
+        if (!deleted)
+        {
+            return false;
+        }
+
+        await UnitOfWork.CompleteAsync();
+
+        return true;
     }
 
     public virtual async Task<bool> ArchiveAsync(long id)
     {
-        return await BaseRepository.ArchiveAsync(id);
+        bool archived = await BaseRepository.ArchiveAsync(id);
+
+        if (!archived)
+        {
+            return false;
+        }
+
+        await UnitOfWork.CompleteAsync();
+
+        return true;
     }
 
     public virtual async Task<bool> UnarchiveAsync(long id)
     {
-        return await BaseRepository.UnarchiveAsync(id);
+        bool unarchived = await BaseRepository.UnarchiveAsync(id);
+
+        if (!unarchived)
+        {
+            return false;
+        }
+
+        await UnitOfWork.CompleteAsync();
+
+        return true;
     }
 
     protected virtual Task ValidateAsync(TEntity entity, bool isCreate)

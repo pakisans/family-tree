@@ -11,6 +11,11 @@ public class FamilyTreeContext : DbContext
     {
     }
 
+    public DbSet<Person> Persons => Set<Person>();
+
+
+
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         DateTime utcNow = DateTime.UtcNow;
