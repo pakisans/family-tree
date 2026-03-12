@@ -7,6 +7,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 ISystemConfiguration systemConfiguration = builder.AddSystemConfiguration();
 
 builder.Services.AddControllers();
+builder.Services.AddApplicationServices();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
