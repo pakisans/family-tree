@@ -82,6 +82,36 @@ public class FamilyTreeContext : DbContext
                 .HasFilter("\"Deleted\" = false");
         });
 
+        modelBuilder.Entity<Person>(entity =>
+        {
+            entity.HasOne(x => x.Family)
+                .WithMany(x => x.Persons)
+                .HasForeignKey(x => x.FamilyId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.FamilyId);
+        });
+
+        modelBuilder.Entity<Relationship>(entity =>
+        {
+            entity.HasOne(x => x.FromPerson)
+                .WithMany()
+                .HasForeignKey(x => x.FromPersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ToPerson)
+                .WithMany()
+                .HasForeignKey(x => x.ToPersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new { x.FromPersonId, x.ToPersonId, x.RelationshipType })
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+
+            entity.HasIndex(x => new { x.FromPersonId, x.RelationshipType });
+            entity.HasIndex(x => new { x.ToPersonId, x.RelationshipType });
+        });
+
         foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
