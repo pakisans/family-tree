@@ -33,4 +33,11 @@ public class PersonController : BaseController<Person, PersonDto, PersonFilterRe
         IList<PersonSummaryDto> children = await _personService.GetChildrenAsync(id);
         return Ok(children);
     }
+
+    [HttpGet("{id:long}/tree")]
+    public async Task<IActionResult> GetTree([FromRoute] long id)
+    {
+        PersonTreeDto result = await _personService.GetTreeAsync(id);
+        return Ok(result);
+    }
 }

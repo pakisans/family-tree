@@ -79,4 +79,38 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
 
         return await _relationshipRepository.GetChildrenAsync(personId);
     }
+
+    public async Task<PersonTreeDto> GetTreeAsync(long personId)
+    {
+        PersonSummaryDto? person = await _personRepository.GetSummaryAsync(personId);
+
+        if (person == null)
+        {
+            throw new HttpResponseException(
+                new ErrorResponse(BaseErrorCode.BASE_0001, BaseErrorCode.GetDescription(BaseErrorCode.BASE_0001)),
+                HttpStatusCode.NotFound);
+        }
+
+        IList<PersonSummaryDto> parents = await _relationshipRepository.GetParentsAsync(personId);
+        IList<PersonSummaryDto> children = await _relationshipRepository.GetChildrenAsync(personId);
+
+        IList<PersonSummaryDto> familyMembers = new List<PersonSummaryDto>();
+
+        if (person.FamilyId.HasValue)
+        {
+            familyMembers = await _personRepository.GetFamilyMembersAsync(person.FamilyId.Value);
+
+            familyMembers = familyMembers
+                .Where(x => x.Id != person.Id)
+                .ToList();
+        }
+
+        return new PersonTreeDto
+        {
+            Person = person,
+            Parents = parents,
+            Children = children,
+            FamilyMembers = familyMembers
+        };
+    }
 }

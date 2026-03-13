@@ -8,4 +8,6 @@ public interface IPersonService : IBaseService<Person, PersonFilterRequest>
 {
     public Task<IList<PersonSummaryDto>> GetParentsAsync(long personId);
     public Task<IList<PersonSummaryDto>> GetChildrenAsync(long personId);
+
+    public Task<PersonTreeDto> GetTreeAsync(long personId);
 }

@@ -31,4 +31,22 @@ public class PersonRepository : BaseRepository<Person>, IPersonRepository
             })
             .ToListAsync();
     }
+
+    public async Task<PersonSummaryDto?> GetSummaryAsync(long personId)
+    {
+        return await DbContext.Persons
+            .AsNoTracking()
+            .Where(person => person.Id == personId)
+            .Select(person => new PersonSummaryDto
+            {
+                Id = person.Id,
+                FirstName = person.FirstName,
+                LastName = person.LastName,
+                BirthDate = person.BirthDate,
+                DeathDate = person.DeathDate,
+                Gender = person.Gender,
+                FamilyId = person.FamilyId
+            })
+            .FirstOrDefaultAsync();
+    }
 }
