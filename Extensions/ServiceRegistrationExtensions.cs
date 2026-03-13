@@ -28,5 +28,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IRelationshipRepository, RelationshipRepository>();
         services.AddScoped<IRelationshipService, RelationshipService>();
         services.AddScoped<IRelationshipConverter, RelationshipConverter>();
+
+        services.AddScoped<IUnionRepository, UnionRepository>();
+        services.AddScoped<IUnionService, UnionService>();
+        services.AddScoped<IUnionConverter, UnionConverter>();
     }
 }

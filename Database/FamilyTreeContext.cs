@@ -15,6 +15,7 @@ public class FamilyTreeContext : DbContext
     public DbSet<Family> Families => Set<Family>();
 
     public DbSet<Relationship> Relationships => Set<Relationship>();
+    public DbSet<Union> Unions => Set<Union>();
 
 
 
@@ -50,7 +51,20 @@ public class FamilyTreeContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<Person>(entity =>
+        foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "entity");
+                MemberExpression deletedProperty = Expression.Property(parameter, nameof(BaseEntity.Deleted));
+                BinaryExpression compareExpression = Expression.Equal(deletedProperty, Expression.Constant(false));
+                LambdaExpression lambda = Expression.Lambda(compareExpression, parameter);
+
+                entityType.SetQueryFilter(lambda);
+            }
+        }
+
+         modelBuilder.Entity<Person>(entity =>
         {
             entity.HasOne(x => x.Family)
                 .WithMany(x => x.Persons)
@@ -112,17 +126,20 @@ public class FamilyTreeContext : DbContext
             entity.HasIndex(x => new { x.ToPersonId, x.RelationshipType });
         });
 
-        foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
+        modelBuilder.Entity<Union>(entity =>
         {
-            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
-            {
-                ParameterExpression parameter = Expression.Parameter(entityType.ClrType, "entity");
-                MemberExpression deletedProperty = Expression.Property(parameter, nameof(BaseEntity.Deleted));
-                BinaryExpression compareExpression = Expression.Equal(deletedProperty, Expression.Constant(false));
-                LambdaExpression lambda = Expression.Lambda(compareExpression, parameter);
+            entity.HasOne(x => x.Person1)
+                .WithMany()
+                .HasForeignKey(x => x.Person1Id)
+                .OnDelete(DeleteBehavior.Restrict);
 
-                entityType.SetQueryFilter(lambda);
-            }
-        }
+            entity.HasOne(x => x.Person2)
+                .WithMany()
+                .HasForeignKey(x => x.Person2Id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new { x.Person1Id, x.Person2Id, x.IsActive })
+                .HasFilter("\"Deleted\" = false");
+        });
     }
 }
