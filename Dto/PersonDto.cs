@@ -22,4 +22,7 @@ public class PersonDto : BaseDto
     public string? Biography { get; set; }
 
     public bool IsPublic { get; set; }
+
+    public long? FamilyId { get; set; }
+
 }

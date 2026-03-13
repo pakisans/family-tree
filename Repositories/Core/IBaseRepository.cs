@@ -1,6 +1,7 @@
 using FamilyTree.Entity;
 using FamilyTree.Features.Filtering;
 using FamilyTree.Features.Pagination;
+using System.Linq.Expressions;
 
 namespace FamilyTree.Repositories.Core;
 
@@ -24,4 +25,6 @@ public interface IBaseRepository<TEntity>
     public Task<bool> ArchiveAsync(long id);
 
     public Task<bool> UnarchiveAsync(long id);
+
+    public Task<TEntity?> GetAsync(Expression<Func<TEntity, bool>> expression);
 }

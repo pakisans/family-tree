@@ -21,4 +21,8 @@ public class Person : BaseEntity
     public string? Biography { get; set; }
 
     public bool IsPublic { get; set; } = false;
+
+    public long? FamilyId { get; set; }
+
+    public Family? Family { get; set; }
 }

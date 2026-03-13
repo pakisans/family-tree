@@ -12,6 +12,9 @@ public class FamilyTreeContext : DbContext
     }
 
     public DbSet<Person> Persons => Set<Person>();
+    public DbSet<Family> Families => Set<Family>();
+
+    public DbSet<Relationship> Relationships => Set<Relationship>();
 
 
 
@@ -46,6 +49,38 @@ public class FamilyTreeContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Person>(entity =>
+        {
+            entity.HasOne(x => x.Family)
+                .WithMany(x => x.Persons)
+                .HasForeignKey(x => x.FamilyId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Family>(entity =>
+        {
+            entity.HasIndex(x => x.Slug)
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+        });
+
+        modelBuilder.Entity<Relationship>(entity =>
+        {
+            entity.HasOne(x => x.FromPerson)
+                .WithMany()
+                .HasForeignKey(x => x.FromPersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ToPerson)
+                .WithMany()
+                .HasForeignKey(x => x.ToPersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new { x.FromPersonId, x.ToPersonId, x.RelationshipType })
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+        });
 
         foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
         {

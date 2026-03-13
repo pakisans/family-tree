@@ -6,6 +6,12 @@ namespace FamilyTree.Converters;
 
 public class PersonConverter : BaseConverter<Person, PersonDto>, IPersonConverter
 {
+    private readonly IFamilyConverter _familyConverter;
+
+    public PersonConverter(IFamilyConverter familyConverter)
+    {
+        _familyConverter = familyConverter;
+    }
     public override PersonDto MapToDto(Person entity)
     {
         return new PersonDto
@@ -23,7 +29,8 @@ public class PersonConverter : BaseConverter<Person, PersonDto>, IPersonConverte
             BirthPlace = entity.BirthPlace,
             DeathPlace = entity.DeathPlace,
             Biography = entity.Biography,
-            IsPublic = entity.IsPublic
+            IsPublic = entity.IsPublic,
+            FamilyId = entity.FamilyId,
         };
     }
 
@@ -43,7 +50,8 @@ public class PersonConverter : BaseConverter<Person, PersonDto>, IPersonConverte
             BirthPlace = dto.BirthPlace,
             DeathPlace = dto.DeathPlace,
             Biography = dto.Biography,
-            IsPublic = dto.IsPublic
+            IsPublic = dto.IsPublic,
+            FamilyId = dto.FamilyId
         };
     }
 }

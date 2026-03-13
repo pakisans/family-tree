@@ -3,6 +3,7 @@ using System;
 using FamilyTree.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FamilyTree.Migrations
 {
     [DbContext(typeof(FamilyTreeContext))]
-    partial class FamilyTreeContextModelSnapshot : ModelSnapshot
+    [Migration("20260312215257_AddFamilyEntity2")]
+    partial class AddFamilyEntity2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -148,55 +151,6 @@ namespace FamilyTree.Migrations
                     b.ToTable("Persons");
                 });
 
-            modelBuilder.Entity("FamilyTree.Entity.Relationship", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<bool>("Archived")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("DateCreated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("DateUpdated")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("Deleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<long>("FromPersonId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("ItemOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<long?>("OwnerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("RelationshipType")
-                        .HasColumnType("integer");
-
-                    b.Property<long>("ToPersonId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ToPersonId");
-
-                    b.HasIndex("FromPersonId", "ToPersonId", "RelationshipType")
-                        .IsUnique()
-                        .HasFilter("\"Deleted\" = false");
-
-                    b.ToTable("Relationships");
-                });
-
             modelBuilder.Entity("FamilyTree.Entity.Person", b =>
                 {
                     b.HasOne("FamilyTree.Entity.Family", "Family")
@@ -205,25 +159,6 @@ namespace FamilyTree.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Family");
-                });
-
-            modelBuilder.Entity("FamilyTree.Entity.Relationship", b =>
-                {
-                    b.HasOne("FamilyTree.Entity.Person", "FromPerson")
-                        .WithMany()
-                        .HasForeignKey("FromPersonId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FamilyTree.Entity.Person", "ToPerson")
-                        .WithMany()
-                        .HasForeignKey("ToPersonId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("FromPerson");
-
-                    b.Navigation("ToPerson");
                 });
 
             modelBuilder.Entity("FamilyTree.Entity.Family", b =>

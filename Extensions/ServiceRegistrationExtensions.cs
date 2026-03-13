@@ -20,5 +20,13 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IPersonRepository, PersonRepository>();
         services.AddScoped<IPersonService, PersonService>();
         services.AddScoped<IPersonConverter, PersonConverter>();
+
+        services.AddScoped<IFamilyRepository, FamilyRepository>();
+        services.AddScoped<IFamilyService, FamilyService>();
+        services.AddScoped<IFamilyConverter, FamilyConverter>();
+
+        services.AddScoped<IRelationshipRepository, RelationshipRepository>();
+        services.AddScoped<IRelationshipService, RelationshipService>();
+        services.AddScoped<IRelationshipConverter, RelationshipConverter>();
     }
 }

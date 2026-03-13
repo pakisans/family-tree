@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using FamilyTree.Database;
 using FamilyTree.Entity;
 using FamilyTree.Features.Filtering;
@@ -132,5 +133,10 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity>
         await DbContext.SaveChangesAsync();
 
         return true;
+    }
+
+    public virtual async Task<TEntity?> GetAsync(Expression<Func<TEntity, bool>> expression)
+    {
+        return await DbContext.Set<TEntity>().FirstOrDefaultAsync(expression);
     }
 }
