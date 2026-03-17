@@ -40,4 +40,22 @@ public class PersonController : BaseController<Person, PersonDto, PersonFilterRe
         PersonTreeDto result = await _personService.GetTreeAsync(id);
         return Ok(result);
     }
+
+    [HttpGet("{id:long}/graph")]
+    public async Task<IActionResult> GetGraph(
+        [FromRoute] long id,
+        [FromQuery] int up = 2,
+        [FromQuery] int down = 2,
+        [FromQuery] bool includePartners = true,
+        [FromQuery] bool includeSiblings = true)
+    {
+        PersonTreeGraphDto result = await _personService.GetGraphAsync(
+            id,
+            up,
+            down,
+            includePartners,
+            includeSiblings);
+
+        return Ok(result);
+    }
 }

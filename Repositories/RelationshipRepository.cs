@@ -1,6 +1,7 @@
 using FamilyTree.Constants;
 using FamilyTree.Database;
 using FamilyTree.Dto;
+using FamilyTree.Dto.Response.Graph;
 using FamilyTree.Entity;
 using FamilyTree.Repositories.Core;
 using Microsoft.EntityFrameworkCore;
@@ -56,6 +57,50 @@ public class RelationshipRepository : BaseRepository<Relationship>, IRelationshi
             })
             .OrderBy(person => person.LastName)
             .ThenBy(person => person.FirstName)
+            .ToListAsync();
+    }
+
+    public async Task<IList<PersonRelationRecordDto>> GetParentRelationsForChildrenAsync(ICollection<long> childIds)
+    {
+        if (childIds.Count == 0)
+        {
+            return new List<PersonRelationRecordDto>();
+        }
+
+        return await DbContext.Relationships
+            .AsNoTracking()
+            .Where(relationship =>
+                childIds.Contains(relationship.ToPersonId) &&
+                (relationship.RelationshipType == RelationshipType.Parent ||
+                 relationship.RelationshipType == RelationshipType.AdoptiveParent))
+            .Select(relationship => new PersonRelationRecordDto
+            {
+                SourcePersonId = relationship.FromPersonId,
+                TargetPersonId = relationship.ToPersonId,
+                EdgeType = "parent-child"
+            })
+            .ToListAsync();
+    }
+
+    public async Task<IList<PersonRelationRecordDto>> GetChildRelationsForParentsAsync(ICollection<long> parentIds)
+    {
+        if (parentIds.Count == 0)
+        {
+            return new List<PersonRelationRecordDto>();
+        }
+
+        return await DbContext.Relationships
+            .AsNoTracking()
+            .Where(relationship =>
+                parentIds.Contains(relationship.FromPersonId) &&
+                (relationship.RelationshipType == RelationshipType.Parent ||
+                 relationship.RelationshipType == RelationshipType.AdoptiveParent))
+            .Select(relationship => new PersonRelationRecordDto
+            {
+                SourcePersonId = relationship.FromPersonId,
+                TargetPersonId = relationship.ToPersonId,
+                EdgeType = "parent-child"
+            })
             .ToListAsync();
     }
 }

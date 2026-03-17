@@ -7,4 +7,5 @@ public interface IPersonRepository : IBaseRepository<Person>
 {
     public Task<IList<PersonSummaryDto>> GetFamilyMembersAsync(long familyId);
     public Task<PersonSummaryDto?> GetSummaryAsync(long personId);
+    public Task<IList<PersonSummaryDto>> GetSummariesByIdsAsync(ICollection<long> personIds);
 }

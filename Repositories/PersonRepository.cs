@@ -49,4 +49,27 @@ public class PersonRepository : BaseRepository<Person>, IPersonRepository
             })
             .FirstOrDefaultAsync();
     }
+
+    public async Task<IList<PersonSummaryDto>> GetSummariesByIdsAsync(ICollection<long> personIds)
+    {
+        if (personIds.Count == 0)
+        {
+            return new List<PersonSummaryDto>();
+        }
+
+        return await DbContext.Persons
+            .AsNoTracking()
+            .Where(person => personIds.Contains(person.Id))
+            .Select(person => new PersonSummaryDto
+            {
+                Id = person.Id,
+                FirstName = person.FirstName,
+                LastName = person.LastName,
+                BirthDate = person.BirthDate,
+                DeathDate = person.DeathDate,
+                Gender = person.Gender,
+                FamilyId = person.FamilyId
+            })
+            .ToListAsync();
+    }
 }
