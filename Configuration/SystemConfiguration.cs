@@ -1,3 +1,5 @@
+using FamilyTree.Configuration;
+
 namespace family_tree.Configuration;
 
 public class SystemConfiguration : ISystemConfiguration
@@ -8,6 +10,7 @@ public class SystemConfiguration : ISystemConfiguration
     public S3Configuration S3 { get; set; } = new();
     public EmailServerConfiguration EmailServer { get; set; } = new();
     public string ApiKey { get; set; } = string.Empty;
+    public AdminConfiguration Admin { get; set; } = new();
 }
 
 public class S3Configuration

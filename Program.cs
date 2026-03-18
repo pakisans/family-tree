@@ -1,25 +1,60 @@
+using System.Text;
+using System.Text.Json.Serialization;
 using family_tree.Configuration;
+using FamilyTree.Converters.Json;
 using FamilyTree.Extensions;
 using FamilyTree.Middlewares;
+using FamilyTree.Services.Core.Seed;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 ISystemConfiguration systemConfiguration = builder.AddSystemConfiguration();
 
-builder.Services.AddControllers();
-builder.Services.AddApplicationServices();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new NullableDateTimeConverter());
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddApplicationServices();
+
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = systemConfiguration.Jwt.Authority,
+            ValidAudience = systemConfiguration.Jwt.Authority,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(systemConfiguration.Jwt.Key))
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 builder.AddDatabase(systemConfiguration);
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("Frontend", policy =>
     {
-        policy.AllowAnyHeader()
+        policy.WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowAnyOrigin();
+            .AllowCredentials();
     });
 });
 
@@ -34,10 +69,19 @@ if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Local
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseCors("Frontend");
+
+app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
 
 app.ApplyDatabaseMigrations();
+
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    ISeedDataService seedDataService = scope.ServiceProvider.GetRequiredService<ISeedDataService>();
+    await seedDataService.SeedAsync();
+}
+
+app.MapControllers();
 
 app.Run();

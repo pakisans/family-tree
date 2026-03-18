@@ -12,12 +12,23 @@ public class UnitOfWork : IUnitOfWork
     public UnitOfWork(FamilyTreeContext context)
     {
         _context = context;
+
+        Users = new UserRepository(_context);
+        Roles = new RoleRepository(_context);
+        RefreshTokens = new RefreshTokenRepository(_context);
+        FamilyAccesses = new FamilyAccessRepository(_context);
+        FamilyInvitations = new FamilyInvitationRepository(_context);
     }
 
-    public async Task CompleteAsync()
-    {
-        await _context.SaveChangesAsync();
-    }
+    public IUserRepository Users { get; }
+
+    public IRoleRepository Roles { get; }
+
+    public IRefreshTokenRepository RefreshTokens { get; }
+
+    public IFamilyAccessRepository FamilyAccesses { get; }
+
+    public IFamilyInvitationRepository FamilyInvitations { get; }
 
     public IBaseRepository<TEntity> GetRepository<TEntity>()
         where TEntity : BaseEntity
@@ -29,12 +40,15 @@ public class UnitOfWork : IUnitOfWork
             return (IBaseRepository<TEntity>)_repositories[type];
         }
 
-        IBaseRepository<TEntity> repository =
-            new BaseRepository<TEntity>(_context);
-
+        IBaseRepository<TEntity> repository = new BaseRepository<TEntity>(_context);
         _repositories.Add(type, repository);
 
         return repository;
+    }
+
+    public async Task CompleteAsync()
+    {
+        await _context.SaveChangesAsync();
     }
 
     public void Dispose()

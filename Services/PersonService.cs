@@ -1,4 +1,5 @@
 using System.Net;
+using FamilyTree.Configuration;
 using FamilyTree.Dto;
 using FamilyTree.Dto.Response.Graph;
 using FamilyTree.Entity;
@@ -14,18 +15,21 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
     private readonly IPersonRepository _personRepository;
     private readonly IRelationshipRepository _relationshipRepository;
     private readonly IUnionRepository _unionRepository;
+    private readonly IFamilyAuthorizationService _familyAuthorizationService;
 
     public PersonService(
         IUnitOfWork unitOfWork,
         IHttpContextAccessor httpContextAccessor,
         IPersonRepository personRepository,
         IRelationshipRepository relationshipRepository,
-        IUnionRepository unionRepository)
+        IUnionRepository unionRepository,
+        IFamilyAuthorizationService familyAuthorizationService)
         : base(unitOfWork, httpContextAccessor, personRepository)
     {
         _personRepository = personRepository;
         _relationshipRepository = relationshipRepository;
         _unionRepository = unionRepository;
+        _familyAuthorizationService = familyAuthorizationService;
     }
 
     protected override string[] SearchableProperties =>
@@ -56,39 +60,79 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
         return Task.CompletedTask;
     }
 
-    public async Task<IList<PersonSummaryDto>> GetParentsAsync(long personId)
+    public override async Task<Person?> AddAsync(Person entity)
     {
-        Person? person = await _personRepository.GetAsync(personId);
+        if (entity.FamilyId.HasValue)
+        {
+            await _familyAuthorizationService.EnsureCanEditFamilyByIdAsync(entity.FamilyId.Value);
+        }
+
+        return await base.AddAsync(entity);
+    }
+
+    public override async Task<Person?> UpdateAsync(long id, Person entity)
+    {
+        Person? existingPerson = await _personRepository.GetAsync(id);
+
+        if (existingPerson == null)
+        {
+            return null;
+        }
+
+        if (existingPerson.FamilyId.HasValue)
+        {
+            await _familyAuthorizationService.EnsureCanEditFamilyByIdAsync(existingPerson.FamilyId.Value);
+        }
+
+        if (entity.FamilyId.HasValue)
+        {
+            await _familyAuthorizationService.EnsureCanEditFamilyByIdAsync(entity.FamilyId.Value);
+        }
+
+        return await base.UpdateAsync(id, entity);
+    }
+
+    public override async Task<Person?> GetAsync(long id)
+    {
+        Person? person = await _personRepository.GetAsync(id);
 
         if (person == null)
         {
-            throw new HttpResponseException(
-                new ErrorResponse(BaseErrorCode.BASE_0001, BaseErrorCode.GetDescription(BaseErrorCode.BASE_0001)),
-                HttpStatusCode.NotFound);
+            return null;
         }
 
-        return await _relationshipRepository.GetParentsAsync(personId);
+        await EnsureReadAccessForPersonAsync(person);
+
+        return person;
+    }
+
+    public async Task<IList<PersonSummaryDto>> GetParentsAsync(long personId)
+    {
+        Person person = await GetRequiredPersonAsync(personId);
+
+        await EnsureReadAccessForPersonAsync(person);
+
+        return await _relationshipRepository.GetParentsAsync(person.Id);
     }
 
     public async Task<IList<PersonSummaryDto>> GetChildrenAsync(long personId)
     {
-        Person? person = await _personRepository.GetAsync(personId);
+        Person person = await GetRequiredPersonAsync(personId);
 
-        if (person == null)
-        {
-            throw new HttpResponseException(
-                new ErrorResponse(BaseErrorCode.BASE_0001, BaseErrorCode.GetDescription(BaseErrorCode.BASE_0001)),
-                HttpStatusCode.NotFound);
-        }
+        await EnsureReadAccessForPersonAsync(person);
 
-        return await _relationshipRepository.GetChildrenAsync(personId);
+        return await _relationshipRepository.GetChildrenAsync(person.Id);
     }
 
     public async Task<PersonTreeDto> GetTreeAsync(long personId)
     {
-        PersonSummaryDto? person = await _personRepository.GetSummaryAsync(personId);
+        Person person = await GetRequiredPersonAsync(personId);
 
-        if (person == null)
+        await EnsureReadAccessForPersonAsync(person);
+
+        PersonSummaryDto? personSummary = await _personRepository.GetSummaryAsync(personId);
+
+        if (personSummary == null)
         {
             throw new HttpResponseException(
                 new ErrorResponse(BaseErrorCode.BASE_0001, BaseErrorCode.GetDescription(BaseErrorCode.BASE_0001)),
@@ -100,18 +144,17 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
 
         IList<PersonSummaryDto> familyMembers = new List<PersonSummaryDto>();
 
-        if (person.FamilyId.HasValue)
+        if (personSummary.FamilyId.HasValue)
         {
-            familyMembers = await _personRepository.GetFamilyMembersAsync(person.FamilyId.Value);
-
+            familyMembers = await _personRepository.GetFamilyMembersAsync(personSummary.FamilyId.Value);
             familyMembers = familyMembers
-                .Where(x => x.Id != person.Id)
+                .Where(x => x.Id != personSummary.Id)
                 .ToList();
         }
 
         return new PersonTreeDto
         {
-            Person = person,
+            Person = personSummary,
             Parents = parents,
             Children = children,
             FamilyMembers = familyMembers
@@ -120,7 +163,7 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
 
     public async Task<PersonTreeGraphDto> GetGraphAsync(long personId)
     {
-        return await GetGraphAsync(personId, 2, 2, true, true);
+        return await GetGraphAsync(personId, GraphConfiguration.DefaultUpDepth, GraphConfiguration.DefaultDownDepth, true, true);
     }
 
     public async Task<PersonTreeGraphDto> GetGraphAsync(
@@ -140,15 +183,19 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
             down = 0;
         }
 
-        if (up > 5)
+        if (up > GraphConfiguration.MaxUpDepth)
         {
-            up = 5;
+            up = GraphConfiguration.MaxUpDepth;
         }
 
-        if (down > 5)
+        if (down > GraphConfiguration.MaxDownDepth)
         {
-            down = 5;
+            down = GraphConfiguration.MaxDownDepth;
         }
+
+        Person person = await GetRequiredPersonAsync(personId);
+
+        await EnsureReadAccessForPersonAsync(person);
 
         PersonSummaryDto? rootPerson = await _personRepository.GetSummaryAsync(personId);
 
@@ -184,8 +231,16 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
             DownDepth = down,
             IncludePartners = includePartners,
             IncludeSiblings = includeSiblings,
-            Nodes = nodeMap.Values.OrderBy(x => x.Level).ThenBy(x => x.LastName).ThenBy(x => x.FirstName).ToList(),
-            Edges = edgeMap.Values.OrderBy(x => x.EdgeType).ThenBy(x => x.SourceId).ThenBy(x => x.TargetId).ToList()
+            Nodes = nodeMap.Values
+                .OrderBy(x => x.Level)
+                .ThenBy(x => x.LastName)
+                .ThenBy(x => x.FirstName)
+                .ToList(),
+            Edges = edgeMap.Values
+                .OrderBy(x => x.EdgeType)
+                .ThenBy(x => x.SourceId)
+                .ThenBy(x => x.TargetId)
+                .ToList()
         };
     }
 
@@ -313,7 +368,8 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
 
         foreach (PersonRelationRecordDto relation in unionRelations)
         {
-            string edgeId = $"union-{Math.Min(relation.SourcePersonId, relation.TargetPersonId)}-{Math.Max(relation.SourcePersonId, relation.TargetPersonId)}";
+            string edgeId =
+                $"union-{Math.Min(relation.SourcePersonId, relation.TargetPersonId)}-{Math.Max(relation.SourcePersonId, relation.TargetPersonId)}";
 
             AddEdge(
                 edgeMap,
@@ -372,6 +428,28 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
         }
     }
 
+    private async Task<Person> GetRequiredPersonAsync(long personId)
+    {
+        Person? person = await _personRepository.GetAsync(personId);
+
+        if (person == null)
+        {
+            throw new HttpResponseException(
+                new ErrorResponse(BaseErrorCode.BASE_0001, BaseErrorCode.GetDescription(BaseErrorCode.BASE_0001)),
+                HttpStatusCode.NotFound);
+        }
+
+        return person;
+    }
+
+    private async Task EnsureReadAccessForPersonAsync(Person person)
+    {
+        if (person.FamilyId.HasValue)
+        {
+            await _familyAuthorizationService.EnsureCanReadFamilyByIdAsync(person.FamilyId.Value);
+        }
+    }
+
     private static void AddNode(
         IDictionary<long, PersonTreeNodeDto> nodeMap,
         PersonSummaryDto person,
@@ -404,7 +482,7 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
             Gender = person.Gender,
             FamilyId = person.FamilyId,
             IsRoot = isRoot,
-            IsPublic = false,
+            IsPublic = person.IsPublic,
             Level = level
         });
     }

@@ -46,7 +46,6 @@ public class BaseService<TEntity, TFilter> : IBaseService<TEntity, TFilter>
         await ValidateAsync(entity, true);
 
         TEntity addedEntity = await BaseRepository.AddAsync(entity);
-        await UnitOfWork.CompleteAsync();
 
         return addedEntity;
     }
@@ -62,8 +61,6 @@ public class BaseService<TEntity, TFilter> : IBaseService<TEntity, TFilter>
             return null;
         }
 
-        await UnitOfWork.CompleteAsync();
-
         return updatedEntity;
     }
 
@@ -75,8 +72,6 @@ public class BaseService<TEntity, TFilter> : IBaseService<TEntity, TFilter>
         {
             return false;
         }
-
-        await UnitOfWork.CompleteAsync();
 
         return true;
     }
@@ -90,8 +85,6 @@ public class BaseService<TEntity, TFilter> : IBaseService<TEntity, TFilter>
             return false;
         }
 
-        await UnitOfWork.CompleteAsync();
-
         return true;
     }
 
@@ -103,8 +96,6 @@ public class BaseService<TEntity, TFilter> : IBaseService<TEntity, TFilter>
         {
             return false;
         }
-
-        await UnitOfWork.CompleteAsync();
 
         return true;
     }

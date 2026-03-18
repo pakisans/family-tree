@@ -1,6 +1,5 @@
 namespace FamilyTree.Entity;
 
-
 public class Family : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
@@ -20,4 +19,8 @@ public class Family : BaseEntity
     public string? SeoDescription { get; set; }
 
     public ICollection<Person> Persons { get; set; } = new List<Person>();
+
+    public ICollection<FamilyAccess> FamilyAccesses { get; set; } = new List<FamilyAccess>();
+
+    public ICollection<FamilyInvitation> Invitations { get; set; } = new List<FamilyInvitation>();
 }

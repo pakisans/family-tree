@@ -17,6 +17,13 @@ public class FamilyTreeContext : DbContext
     public DbSet<Relationship> Relationships => Set<Relationship>();
     public DbSet<Union> Unions => Set<Union>();
 
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<FamilyAccess> FamilyAccesses => Set<FamilyAccess>();
+    public DbSet<FamilyInvitation> FamilyInvitations => Set<FamilyInvitation>();
+
 
 
 
@@ -139,6 +146,88 @@ public class FamilyTreeContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(x => new { x.Person1Id, x.Person2Id, x.IsActive })
+                .HasFilter("\"Deleted\" = false");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(x => x.Email)
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+        });
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.HasIndex(x => x.Name)
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => new { x.UserId, x.RoleId })
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.RefreshTokens)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.Token)
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+        });
+
+        modelBuilder.Entity<FamilyAccess>(entity =>
+        {
+            entity.HasOne(x => x.Family)
+                .WithMany(x => x.FamilyAccesses)
+                .HasForeignKey(x => x.FamilyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.FamilyAccesses)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.InvitedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.InvitedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new { x.FamilyId, x.UserId })
+                .IsUnique()
+                .HasFilter("\"Deleted\" = false");
+        });
+
+        modelBuilder.Entity<FamilyInvitation>(entity =>
+        {
+            entity.HasOne(x => x.Family)
+                .WithMany(x => x.Invitations)
+                .HasForeignKey(x => x.FamilyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.InvitedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.InvitedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => x.Token)
+                .IsUnique()
                 .HasFilter("\"Deleted\" = false");
         });
     }
