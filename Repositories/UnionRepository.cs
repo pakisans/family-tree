@@ -101,4 +101,25 @@ public class UnionRepository : BaseRepository<Union>, IUnionRepository
             })
             .ToListAsync();
     }
+
+    public async Task<IList<PersonRelationRecordDto>> GetUnionEdgesForPersonsAsync(ICollection<long> personIds)
+    {
+        if (personIds.Count == 0)
+        {
+            return new List<PersonRelationRecordDto>();
+        }
+
+        return await DbContext.Unions
+            .AsNoTracking()
+            .Where(union =>
+                personIds.Contains(union.Person1Id) &&
+                personIds.Contains(union.Person2Id))
+            .Select(union => new PersonRelationRecordDto
+            {
+                SourcePersonId = union.Person1Id,
+                TargetPersonId = union.Person2Id,
+                EdgeType = "union"
+            })
+            .ToListAsync();
+    }
 }

@@ -11,3 +11,9 @@ appsettings.Development.json
 appsettings.json
 appsettings.Local.json
 appsettings.Production.json
+
+
+CLAUDE.md
+FRONTEND_HANDOFF.md
+MEMORY.md
+project_architecture.md

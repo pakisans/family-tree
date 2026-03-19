@@ -9,4 +9,5 @@ public interface IUnionRepository : IBaseRepository<Union>
     public Task<IList<UnionSummaryDto>> GetPartnersAsync(long personId);
     public Task<IList<PersonSummaryDto>> GetPartnerPersonsAsync(long personId);
     public Task<IList<PersonRelationRecordDto>> GetUnionRelationsAsync(ICollection<long> personIds);
+    public Task<IList<PersonRelationRecordDto>> GetUnionEdgesForPersonsAsync(ICollection<long> personIds);
 }

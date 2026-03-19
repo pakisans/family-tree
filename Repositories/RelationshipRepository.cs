@@ -103,4 +103,27 @@ public class RelationshipRepository : BaseRepository<Relationship>, IRelationshi
             })
             .ToListAsync();
     }
+
+    public async Task<IList<PersonRelationRecordDto>> GetRelationshipEdgesForPersonsAsync(ICollection<long> personIds)
+    {
+        if (personIds.Count == 0)
+        {
+            return new List<PersonRelationRecordDto>();
+        }
+
+        return await DbContext.Relationships
+            .AsNoTracking()
+            .Where(relationship =>
+                personIds.Contains(relationship.FromPersonId) &&
+                personIds.Contains(relationship.ToPersonId) &&
+                (relationship.RelationshipType == RelationshipType.Parent ||
+                 relationship.RelationshipType == RelationshipType.AdoptiveParent))
+            .Select(relationship => new PersonRelationRecordDto
+            {
+                SourcePersonId = relationship.FromPersonId,
+                TargetPersonId = relationship.ToPersonId,
+                EdgeType = "parent-child"
+            })
+            .ToListAsync();
+    }
 }

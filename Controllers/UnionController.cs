@@ -3,10 +3,13 @@ using FamilyTree.Dto;
 using FamilyTree.Entity;
 using FamilyTree.Features.Filtering;
 using FamilyTree.Services.Core;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FamilyTree.Controllers;
 
+[ApiController]
+[Authorize]
 [Route("api/unions")]
 public class UnionController : BaseController<Union, UnionDto, UnionFilterRequest>
 {

@@ -5,6 +5,7 @@ using FamilyTree.Dto.Response.Graph;
 using FamilyTree.Entity;
 using FamilyTree.Errors;
 using FamilyTree.Features.Filtering;
+using FamilyTree.Features.Pagination;
 using FamilyTree.Repositories.Core;
 using FamilyTree.Services.Core;
 
@@ -90,6 +91,37 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
         }
 
         return await base.UpdateAsync(id, entity);
+    }
+
+    public override async Task<FilterList<Person>> GetListAsync(PersonFilterRequest filterRequest)
+    {
+        FilterList<Person> result = await base.GetListAsync(filterRequest);
+
+        HashSet<long> familyIds = result.Items
+            .Where(p => p.FamilyId.HasValue)
+            .Select(p => p.FamilyId!.Value)
+            .ToHashSet();
+
+        HashSet<long> accessibleFamilyIds = new HashSet<long>();
+
+        foreach (long familyId in familyIds)
+        {
+            bool canRead = await _familyAuthorizationService.CanReadFamilyByIdAsync(familyId);
+
+            if (canRead)
+            {
+                accessibleFamilyIds.Add(familyId);
+            }
+        }
+
+        List<Person> allowedItems = result.Items
+            .Where(p => !p.FamilyId.HasValue || accessibleFamilyIds.Contains(p.FamilyId.Value))
+            .ToList();
+
+        result.Items = allowedItems;
+        result.TotalCount = allowedItems.Count;
+
+        return result;
     }
 
     public override async Task<Person?> GetAsync(long id)
@@ -224,6 +256,8 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
             await ExpandSiblingsAsync(rootPerson.Id, nodeMap, edgeMap);
         }
 
+        await FilterNodesByFamilyAccessAsync(nodeMap, edgeMap);
+
         return new PersonTreeGraphDto
         {
             RootPersonId = rootPerson.Id,
@@ -234,6 +268,62 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
             Nodes = nodeMap.Values
                 .OrderBy(x => x.Level)
                 .ThenBy(x => x.LastName)
+                .ThenBy(x => x.FirstName)
+                .ToList(),
+            Edges = edgeMap.Values
+                .OrderBy(x => x.EdgeType)
+                .ThenBy(x => x.SourceId)
+                .ThenBy(x => x.TargetId)
+                .ToList()
+        };
+    }
+
+    public async Task<PersonTreeGraphDto> GetFamilyGraphAsync(long familyId)
+    {
+        await _familyAuthorizationService.EnsureCanReadFamilyByIdAsync(familyId);
+
+        IList<PersonSummaryDto> persons = await _personRepository.GetFamilyMembersAsync(familyId);
+
+        if (persons.Count == 0)
+        {
+            return new PersonTreeGraphDto { RootPersonId = 0 };
+        }
+
+        HashSet<long> personIds = persons.Select(p => p.Id).ToHashSet();
+
+        IList<PersonRelationRecordDto> relationshipEdges =
+            await _relationshipRepository.GetRelationshipEdgesForPersonsAsync(personIds);
+
+        IList<PersonRelationRecordDto> unionEdges =
+            await _unionRepository.GetUnionEdgesForPersonsAsync(personIds);
+
+        Dictionary<long, PersonTreeNodeDto> nodeMap = new Dictionary<long, PersonTreeNodeDto>();
+        Dictionary<string, PersonTreeEdgeDto> edgeMap = new Dictionary<string, PersonTreeEdgeDto>();
+
+        foreach (PersonSummaryDto person in persons)
+        {
+            AddNode(nodeMap, person, false, 0);
+        }
+
+        foreach (PersonRelationRecordDto rel in relationshipEdges)
+        {
+            AddEdge(edgeMap, $"parent-{rel.SourcePersonId}-{rel.TargetPersonId}", rel.SourcePersonId, rel.TargetPersonId, "parent-child");
+        }
+
+        foreach (PersonRelationRecordDto union in unionEdges)
+        {
+            AddEdge(edgeMap, $"union-{union.SourcePersonId}-{union.TargetPersonId}", union.SourcePersonId, union.TargetPersonId, "union");
+        }
+
+        return new PersonTreeGraphDto
+        {
+            RootPersonId = 0,
+            UpDepth = 0,
+            DownDepth = 0,
+            IncludePartners = true,
+            IncludeSiblings = true,
+            Nodes = nodeMap.Values
+                .OrderBy(x => x.LastName)
                 .ThenBy(x => x.FirstName)
                 .ToList(),
             Edges = edgeMap.Values
@@ -392,19 +482,19 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
             return;
         }
 
-        HashSet<long> siblingIds = new HashSet<long>();
+        List<long> parentIds = parents.Select(p => p.Id).ToList();
 
-        foreach (PersonSummaryDto parent in parents)
+        IList<PersonRelationRecordDto> childRelations =
+            await _relationshipRepository.GetChildRelationsForParentsAsync(parentIds);
+
+        HashSet<long> siblingIds = childRelations
+            .Select(r => r.TargetPersonId)
+            .Where(id => id != rootPersonId)
+            .ToHashSet();
+
+        if (siblingIds.Count == 0)
         {
-            IList<PersonSummaryDto> children = await _relationshipRepository.GetChildrenAsync(parent.Id);
-
-            foreach (PersonSummaryDto child in children)
-            {
-                if (child.Id != rootPersonId)
-                {
-                    siblingIds.Add(child.Id);
-                }
-            }
+            return;
         }
 
         IList<PersonSummaryDto> siblings = await _personRepository.GetSummariesByIdsAsync(siblingIds.ToList());
@@ -414,17 +504,65 @@ public class PersonService : BaseService<Person, PersonFilterRequest>, IPersonSe
             AddNode(nodeMap, sibling, false, 0);
         }
 
-        foreach (PersonSummaryDto parent in parents)
+        foreach (PersonRelationRecordDto relation in childRelations)
         {
-            foreach (PersonSummaryDto sibling in siblings)
+            if (relation.TargetPersonId == rootPersonId)
             {
-                AddEdge(
-                    edgeMap,
-                    $"parent-{parent.Id}-{sibling.Id}",
-                    parent.Id,
-                    sibling.Id,
-                    "parent-child");
+                continue;
             }
+
+            AddEdge(
+                edgeMap,
+                $"parent-{relation.SourcePersonId}-{relation.TargetPersonId}",
+                relation.SourcePersonId,
+                relation.TargetPersonId,
+                "parent-child");
+        }
+    }
+
+    private async Task FilterNodesByFamilyAccessAsync(
+        IDictionary<long, PersonTreeNodeDto> nodeMap,
+        IDictionary<string, PersonTreeEdgeDto> edgeMap)
+    {
+        HashSet<long> familyIds = nodeMap.Values
+            .Where(n => n.FamilyId.HasValue)
+            .Select(n => n.FamilyId!.Value)
+            .ToHashSet();
+
+        HashSet<long> accessibleFamilyIds = new HashSet<long>();
+
+        foreach (long familyId in familyIds)
+        {
+            bool canRead = await _familyAuthorizationService.CanReadFamilyByIdAsync(familyId);
+
+            if (canRead)
+            {
+                accessibleFamilyIds.Add(familyId);
+            }
+        }
+
+        HashSet<long> allowedNodeIds = nodeMap.Values
+            .Where(n => !n.FamilyId.HasValue || accessibleFamilyIds.Contains(n.FamilyId.Value))
+            .Select(n => n.Id)
+            .ToHashSet();
+
+        List<long> removedNodeIds = nodeMap.Keys
+            .Where(id => !allowedNodeIds.Contains(id))
+            .ToList();
+
+        foreach (long id in removedNodeIds)
+        {
+            nodeMap.Remove(id);
+        }
+
+        List<string> removedEdgeIds = edgeMap
+            .Where(kv => !allowedNodeIds.Contains(kv.Value.SourceId) || !allowedNodeIds.Contains(kv.Value.TargetId))
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (string id in removedEdgeIds)
+        {
+            edgeMap.Remove(id);
         }
     }
 

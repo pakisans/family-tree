@@ -22,6 +22,14 @@ public class FamilyAccessRepository : BaseRepository<FamilyAccess>, IFamilyAcces
                 familyAccess.IsActive);
     }
 
+    public async Task<FamilyAccess?> GetAnyAccessAsync(long familyId, long userId)
+    {
+        return await DbContext.FamilyAccesses
+            .FirstOrDefaultAsync(familyAccess =>
+                familyAccess.FamilyId == familyId &&
+                familyAccess.UserId == userId);
+    }
+
     public async Task<IList<FamilyAccess>> GetFamilyAccessesAsync(long familyId)
     {
         return await DbContext.FamilyAccesses

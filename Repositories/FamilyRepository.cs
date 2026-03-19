@@ -36,7 +36,6 @@ public class FamilyRepository : BaseRepository<Family>, IFamilyRepository
             .OrderBy(family => family.Name)
             .Skip(filterRequest.Page * filterRequest.PerPage)
             .Take(filterRequest.PerPage)
-            .Include(family => family.Persons)
             .ToListAsync();
 
         return new FilterList<Family>
@@ -54,7 +53,6 @@ public class FamilyRepository : BaseRepository<Family>, IFamilyRepository
 
         return await DbContext.Families
             .AsNoTracking()
-            .Include(family => family.Persons)
             .FirstOrDefaultAsync(family =>
                 family.IsPublic &&
                 family.Slug.ToLower() == normalizedSlug);

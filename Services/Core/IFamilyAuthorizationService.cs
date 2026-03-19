@@ -18,4 +18,6 @@ public interface IFamilyAuthorizationService
     public Task EnsureCanEditFamilyByIdAsync(long familyId);
 
     public Task EnsureCanManageFamilyAccessByIdAsync(long familyId);
+
+    public Task<bool> CanReadFamilyByIdAsync(long familyId);
 }

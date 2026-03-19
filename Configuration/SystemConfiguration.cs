@@ -41,4 +41,12 @@ public class EmailServerConfiguration
     public string User { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    public string FromEmail { get; set; } = string.Empty;
+    public string FromName { get; set; } = "Rodoslov";
+
+    /// <summary>
+    /// When false, emails are logged but not delivered via SMTP.
+    /// Set to false in local development to avoid sending real emails.
+    /// </summary>
+    public bool EnableEmailSending { get; set; } = false;
 }

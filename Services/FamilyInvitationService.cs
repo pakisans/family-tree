@@ -14,15 +14,21 @@ public class FamilyInvitationService : IFamilyInvitationService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IFamilyAuthorizationService _familyAuthorizationService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<FamilyInvitationService> _logger;
 
     public FamilyInvitationService(
         IUnitOfWork unitOfWork,
         IFamilyAuthorizationService familyAuthorizationService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IEmailService emailService,
+        ILogger<FamilyInvitationService> logger)
     {
         _unitOfWork = unitOfWork;
         _familyAuthorizationService = familyAuthorizationService;
         _currentUserService = currentUserService;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     public async Task InviteAsync(long familyId, InviteUserToFamilyRequestDto request)
@@ -59,6 +65,38 @@ public class FamilyInvitationService : IFamilyInvitationService
         };
 
         await _unitOfWork.FamilyInvitations.AddAsync(invitation);
+
+        // Send invitation email (best-effort — failure is logged but does not
+        // roll back the already-persisted invitation record).
+        try
+        {
+            User? inviter = await _unitOfWork.Users.GetAsync(invitedByUserId.Value);
+            string? inviterName = inviter != null
+                ? $"{inviter.FirstName} {inviter.LastName}".Trim()
+                : null;
+
+            string roleName = invitation.AccessRole switch
+            {
+                FamilyAccessRole.Owner    => "Vlasnik",
+                FamilyAccessRole.Editor   => "Urednik",
+                FamilyAccessRole.ReadOnly => "Posmatrač",
+                _                         => invitation.AccessRole.ToString()
+            };
+
+            await _emailService.SendInvitationEmailAsync(
+                invitation.Email,
+                family.Name,
+                inviterName,
+                roleName,
+                invitation.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Invitation email could not be sent to {Email} for family {FamilyId}. " +
+                "The invitation is saved in the database and can be resent manually.",
+                invitation.Email, familyId);
+        }
     }
 
     public async Task<IList<FamilyCollaboratorDto>> GetCollaboratorsAsync(long familyId)

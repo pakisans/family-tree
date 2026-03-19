@@ -13,4 +13,5 @@ public interface IPersonService : IBaseService<Person, PersonFilterRequest>
     public Task<PersonTreeDto> GetTreeAsync(long personId);
     public Task<PersonTreeGraphDto> GetGraphAsync(long personId);
     public Task<PersonTreeGraphDto> GetGraphAsync(long personId, int up, int down, bool includePartners, bool includeSiblings);
+    public Task<PersonTreeGraphDto> GetFamilyGraphAsync(long familyId);
 }

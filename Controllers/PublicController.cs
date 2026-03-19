@@ -80,6 +80,34 @@ public class PublicController : ControllerBase
         return Ok(members);
     }
 
+    [HttpGet("families/{slug}/graph")]
+    public async Task<IActionResult> GetPublicFamilyGraph([FromRoute] string slug)
+    {
+        Family? family = await _familyRepository.GetPublicBySlugAsync(slug);
+
+        if (family == null)
+        {
+            return NotFound(new ErrorResponse(BaseErrorCode.BASE_0001, "Family not found."));
+        }
+
+        PersonTreeGraphDto graph = await _personService.GetFamilyGraphAsync(family.Id);
+
+        HashSet<long> publicPersonIds = graph.Nodes
+            .Where(node => node.IsPublic)
+            .Select(node => node.Id)
+            .ToHashSet();
+
+        graph.Nodes = graph.Nodes
+            .Where(node => publicPersonIds.Contains(node.Id))
+            .ToList();
+
+        graph.Edges = graph.Edges
+            .Where(edge => publicPersonIds.Contains(edge.SourceId) && publicPersonIds.Contains(edge.TargetId))
+            .ToList();
+
+        return Ok(graph);
+    }
+
     [HttpGet("families/{slug}/graph/{personId:long}")]
     public async Task<IActionResult> GetPublicPersonGraph(
         [FromRoute] string slug,

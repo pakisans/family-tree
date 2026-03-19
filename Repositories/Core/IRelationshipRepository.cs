@@ -11,4 +11,5 @@ public interface IRelationshipRepository : IBaseRepository<Relationship>
 
     public Task<IList<PersonRelationRecordDto>> GetParentRelationsForChildrenAsync(ICollection<long> childIds);
     public Task<IList<PersonRelationRecordDto>> GetChildRelationsForParentsAsync(ICollection<long> parentIds);
+    public Task<IList<PersonRelationRecordDto>> GetRelationshipEdgesForPersonsAsync(ICollection<long> personIds);
 }

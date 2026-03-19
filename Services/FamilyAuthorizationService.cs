@@ -165,4 +165,24 @@ public class FamilyAuthorizationService : IFamilyAuthorizationService
         FamilyAccess? familyAccess = await _familyAccessRepository.GetActiveAccessAsync(familyId, userId);
         return familyAccess?.AccessRole;
     }
+
+    public async Task<bool> CanReadFamilyByIdAsync(long familyId)
+    {
+        Family? family = await _familyRepository.GetAsync(familyId);
+
+        if (family == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            await EnsureCanReadFamilyAsync(family);
+            return true;
+        }
+        catch (HttpResponseException)
+        {
+            return false;
+        }
+    }
 }

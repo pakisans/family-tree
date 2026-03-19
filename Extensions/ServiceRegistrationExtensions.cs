@@ -7,6 +7,7 @@ using FamilyTree.Services.Auth;
 using FamilyTree.Services.Core;
 using FamilyTree.Services.Core.Auth;
 using FamilyTree.Services.Core.Seed;
+using FamilyTree.Services.Email;
 using FamilyTree.Services.Seed;
 
 namespace FamilyTree.Extensions;
@@ -50,5 +51,14 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IFamilyInvitationService, FamilyInvitationService>();
 
         services.AddScoped<ISeedDataService, SeedDataService>();
+
+        // Email system
+        // EmailQueue and EmailSender are Singleton: they hold no per-request state
+        // and must be shared across the lifetime of the application.
+        // EmailService is Scoped (depends on ISystemConfiguration which is Singleton — fine).
+        services.AddSingleton<IEmailQueue, EmailQueue>();
+        services.AddSingleton<IEmailSender, EmailSender>();
+        services.AddScoped<IEmailService, EmailService>();
+        services.AddHostedService<EmailBackgroundWorker>();
     }
 }

@@ -4,6 +4,7 @@ using FamilyTree.Dto.Auth;
 using FamilyTree.Entity;
 using FamilyTree.Errors;
 using FamilyTree.Repositories.Core;
+using FamilyTree.Services.Core;
 using FamilyTree.Services.Core.Auth;
 using Microsoft.AspNetCore.Identity;
 
@@ -14,16 +15,22 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITokenService _tokenService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<AuthService> _logger;
     private readonly PasswordHasher<User> _passwordHasher;
 
     public AuthService(
         IUnitOfWork unitOfWork,
         ITokenService tokenService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IEmailService emailService,
+        ILogger<AuthService> logger)
     {
         _unitOfWork = unitOfWork;
         _tokenService = tokenService;
         _currentUserService = currentUserService;
+        _emailService = emailService;
+        _logger = logger;
         _passwordHasher = new PasswordHasher<User>();
     }
 
@@ -89,7 +96,21 @@ public class AuthService : IAuthService
                 HttpStatusCode.InternalServerError);
         }
 
-        return await _tokenService.CreateAuthResponseAsync(createdUser);
+        AuthResponseDto authResponse = await _tokenService.CreateAuthResponseAsync(createdUser);
+
+        // Send welcome email (best-effort — failure does not affect registration).
+        try
+        {
+            await _emailService.SendWelcomeEmailAsync(createdUser.Email, createdUser.FirstName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Welcome email could not be sent to {Email}. Registration was still successful.",
+                createdUser.Email);
+        }
+
+        return authResponse;
     }
 
     public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request)
@@ -216,8 +237,12 @@ public class AuthService : IAuthService
                 HttpStatusCode.NotFound);
         }
 
+        // Use GetAnyAccessAsync (not GetActiveAccessAsync) to catch the case where
+        // a previously removed collaborator is being re-invited. The DB has a unique
+        // constraint on (FamilyId, UserId), so we must reactivate the existing row
+        // rather than inserting a new one.
         FamilyAccess? existingAccess =
-            await _unitOfWork.FamilyAccesses.GetActiveAccessAsync(invitation.FamilyId, user.Id);
+            await _unitOfWork.FamilyAccesses.GetAnyAccessAsync(invitation.FamilyId, user.Id);
 
         if (existingAccess == null)
         {
@@ -232,6 +257,15 @@ public class AuthService : IAuthService
             };
 
             await _unitOfWork.FamilyAccesses.AddAsync(familyAccess);
+        }
+        else if (!existingAccess.IsActive)
+        {
+            // Collaborator was previously removed — reactivate with the new role.
+            existingAccess.IsActive = true;
+            existingAccess.AccessRole = invitation.AccessRole;
+            existingAccess.InvitedByUserId = invitation.InvitedByUserId;
+            existingAccess.AcceptedAt = DateTime.UtcNow;
+            // existingAccess is tracked, CompleteAsync() at the end will persist this.
         }
 
         invitation.Status = InvitationStatus.Accepted;
